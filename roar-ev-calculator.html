@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Square Miner EV Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #0A0E0D;
+    --panel: #101615;
+    --panel-2: #141C1A;
+    --line: #223330;
+    --line-soft: #1A2321;
+    --cyan: #2EE6C4;
+    --cyan-dim: #1C8F7A;
+    --amber: #F2B84B;
+    --red: #F2685B;
+    --text: #E7F2EF;
+    --text-dim: #7C948F;
+    --text-faint: #46605A;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(46,230,196,0.06), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    padding:48px 20px 80px;
+  }
+  .wrap{max-width:760px;margin:0 auto;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--cyan-dim);
+    margin:0 0 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:6px;height:6px;border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 6px var(--cyan);
+  }
+  h1{
+    font-size:28px;
+    font-weight:600;
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    color:var(--text-dim);
+    font-size:14.5px;
+    line-height:1.6;
+    margin:0 0 36px;
+    max-width:560px;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:24px;
+    margin-bottom:20px;
+  }
+  .panel-label{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color:var(--text-faint);
+    margin:0 0 16px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px 18px;
+  }
+  .field label{
+    display:block;
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .field .row{display:flex;gap:8px;}
+  input[type=number]{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--line);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:14px;
+    padding:9px 10px;
+    border-radius:6px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input[type=number]:focus{border-color:var(--cyan-dim);}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{opacity:0.4;}
+
+  .results{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:14px;
+    margin-bottom:20px;
+  }
+  .metric{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px 16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .metric::before{
+    content:'';
+    position:absolute;top:0;left:0;right:0;height:2px;
+    background:var(--metric-color, var(--cyan-dim));
+  }
+  .metric-label{
+    font-size:12px;
+    color:var(--text-dim);
+    margin:0 0 8px;
+  }
+  .metric-value{
+    font-family:var(--mono);
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+    color:var(--metric-color, var(--text));
+  }
+  .breakdown{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:20px;
+  }
+  .bd-card{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    background:var(--panel-2);
+  }
+  .bd-card .panel-label{margin-bottom:8px;}
+  .bd-card .val{
+    font-family:var(--mono);
+    font-size:15px;
+    font-weight:500;
+  }
+  .bd-card .val-usd{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+  .chart-wrap{
+    position:relative;
+    height:240px;
+    margin-top:6px;
+  }
+  .chart-note{
+    font-size:12px;
+    color:var(--text-faint);
+    margin:14px 0 0;
+    font-family:var(--mono);
+  }
+  .foot{
+    font-size:12.5px;
+    color:var(--text-faint);
+    line-height:1.7;
+    margin-top:32px;
+    padding-top:20px;
+    border-top:1px solid var(--line-soft);
+  }
+  .foot b{color:var(--text-dim);font-weight:500;}
+  @media (max-width:560px){
+    .grid{grid-template-columns:1fr;}
+    .results{grid-template-columns:1fr;}
+    .breakdown{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Full-coverage mining · 25/25 squares</p>
+  <h1>Square miner EV calculator</h1>
+  <p class="sub">Estimate your expected value per round when you deposit across every square. Adjust the inputs to match a live board, the results and chart update instantly.</p>
+
+  <div class="panel">
+    <p class="panel-label">Inputs</p>
+    <div class="grid">
+      <div class="field">
+        <label for="yourDeposit">Your deposit (ETH)</label>
+        <input type="number" id="yourDeposit" value="0.00125" step="0.00001">
+      </div>
+      <div class="field">
+        <label for="othersDeposit">Other miners total (ETH)</label>
+        <input type="number" id="othersDeposit" value="0.04433" step="0.0001">
+      </div>
+      <div class="field">
+        <label for="ethPrice">ETH price (USD)</label>
+        <input type="number" id="ethPrice" value="1900" step="1">
+      </div>
+      <div class="field">
+        <label for="roarPrice">Token price (USD)</label>
+        <input type="number" id="roarPrice" value="20" step="0.1">
+      </div>
+      <div class="field">
+        <label for="jackpotPool">Jackpot pool (tokens)</label>
+        <input type="number" id="jackpotPool" value="45" step="0.1">
+      </div>
+      <div class="field">
+        <label for="oddsDenom">Jackpot odds (1 in N)</label>
+        <input type="number" id="oddsDenom" value="500" step="1">
+      </div>
+      <div class="field">
+        <label for="roundReward">Round reward (tokens)</label>
+        <input type="number" id="roundReward" value="1" step="0.1">
+      </div>
+      <div class="field">
+        <label>Fees — admin / treasury (bps)</label>
+        <div class="row">
+          <input type="number" id="adminBps" value="100" step="1">
+          <input type="number" id="treasuryBps" value="1000" step="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results">
+    <div class="metric">
+      <p class="metric-label">Your share of pot</p>
+      <p class="metric-value" id="outShare">--</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label">Net EV per round</p>
+      <p class="metric-value" id="outNetEV">--</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label">Expected ROI</p>
+      <p class="metric-value" id="outROI">--</p>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <div class="bd-card">
+      <p class="panel-label">Settlement side</p>
+      <p class="val" id="outSettlementEth">--</p>
+      <p class="val-usd" id="outSettlementUsd">--</p>
+    </div>
+    <div class="bd-card">
+      <p class="panel-label">Token side</p>
+      <p class="val" id="outTokenAmt">--</p>
+      <p class="val-usd" id="outTokenUsd">--</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Net EV vs your deposit size</p>
+    <div class="chart-wrap">
+      <canvas id="evChart"></canvas>
+    </div>
+    <p class="chart-note" id="chartNote">Other miners' deposit held fixed. Marker shows your current position.</p>
+  </div>
+
+  <div class="foot">
+    <b>Assumptions:</b> you cover all 25 squares evenly (guaranteed presence on the winning square). Settlement rewards split proportionally to deposit share on the winning square, after the admin fee and a treasury fee on the losing pool. Token reward = base round reward + expected jackpot value (pool ÷ odds denominator), split the same way. This is expected value across many rounds, not a single-round guarantee — actual per-square deposits may differ from this even-split assumption.
+  </div>
+</div>
+
+<script>
+const ids = ['yourDeposit','othersDeposit','ethPrice','roarPrice','jackpotPool','oddsDenom','roundReward','adminBps','treasuryBps'];
+let chart;
+
+function computeNetEV(y, others, ethPrice, roarPrice, pool, denom, reward, adminBps, treasuryBps){
+  const T = y + others;
+  if (T <= 0) return {netEV:0, share:0, settlementNet:0, tokenExpected:0};
+  const a = adminBps/10000, t = treasuryBps/10000;
+  const s = y / T;
+  const settlementNet = -y * (a + t*(1-a)*(24/25));
+  const expectedTokenPerRound = reward + (pool/denom);
+  const tokenExpected = s * expectedTokenPerRound;
+  const netEV = (settlementNet * ethPrice) + (tokenExpected * roarPrice);
+  return {netEV, share:s, settlementNet, tokenExpected};
+}
+
+function readInputs(){
+  const v = {};
+  ids.forEach(id => v[id] = parseFloat(document.getElementById(id).value) || 0);
+  return v;
+}
+
+function fmtETH(n){ return (n>=0?'+':'') + n.toFixed(6) + ' ETH'; }
+function fmtUSD(n){ return (n>=0?'+$':'-$') + Math.abs(n).toFixed(2); }
+function fmtTok(n){ return (n>=0?'+':'') + n.toFixed(4) + ' tokens'; }
+
+function update(){
+  const v = readInputs();
+  const r = computeNetEV(v.yourDeposit, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.oddsDenom, v.roundReward, v.adminBps, v.treasuryBps);
+
+  document.getElementById('outShare').textContent = (r.share*100).toFixed(2) + '%';
+
+  const evEl = document.getElementById('outNetEV');
+  evEl.textContent = fmtUSD(r.netEV);
+  evEl.parentElement.style.setProperty('--metric-color', r.netEV >= 0 ? 'var(--cyan)' : 'var(--red)');
+
+  const risked = v.yourDeposit * v.ethPrice;
+  const roi = risked > 0 ? (r.netEV / risked) * 100 : 0;
+  const roiEl = document.getElementById('outROI');
+  roiEl.textContent = (roi>=0?'+':'') + roi.toFixed(1) + '%';
+  roiEl.parentElement.style.setProperty('--metric-color', roi >= 0 ? 'var(--cyan)' : 'var(--red)');
+
+  document.getElementById('outSettlementEth').textContent = fmtETH(r.settlementNet);
+  document.getElementById('outSettlementUsd').textContent = fmtUSD(r.settlementNet*v.ethPrice);
+  document.getElementById('outTokenAmt').textContent = fmtTok(r.tokenExpected);
+  document.getElementById('outTokenUsd').textContent = fmtUSD(r.tokenExpected*v.roarPrice);
+
+  const maxX = Math.max(v.othersDeposit * 2, v.yourDeposit * 3, 0.001);
+  const points = 40;
+  const labels = [];
+  const data = [];
+  let peakX = 0, peakY = -Infinity;
+  for (let i = 0; i <= points; i++){
+    const y = (maxX * i) / points;
+    const rr = computeNetEV(y, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.oddsDenom, v.roundReward, v.adminBps, v.treasuryBps);
+    labels.push(y);
+    data.push(rr.netEV);
+    if (rr.netEV > peakY){ peakY = rr.netEV; peakX = y; }
+  }
+
+  document.getElementById('chartNote').textContent =
+    'Other miners\u2019 deposit held fixed. Peak net EV \u2248 ' + fmtUSD(peakY) + ' near ' + peakX.toFixed(5) + ' ETH deposit.';
+
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('evChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels.map(l => l.toFixed(5)),
+      datasets: [
+        {
+          data: data,
+          borderColor: '#2EE6C4',
+          backgroundColor: 'rgba(46,230,196,0.08)',
+          fill: true,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.15
+        },
+        {
+          data: labels.map(l => Math.abs(l - v.yourDeposit) < (maxX/points/2) ? r.netEV : null),
+          borderColor: '#F2B84B',
+          backgroundColor: '#F2B84B',
+          pointRadius: 5,
+          pointHoverRadius: 6,
+          showLine: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          title: { display: true, text: 'Your deposit (ETH)', color: '#7C948F', font:{family:'JetBrains Mono', size:10} },
+          ticks: { color: '#46605A', font:{family:'JetBrains Mono', size:9}, maxTicksLimit: 6 },
+          grid: { color: '#1A2321' }
+        },
+        y: {
+          title: { display: true, text: 'Net EV (USD)', color: '#7C948F', font:{family:'JetBrains Mono', size:10} },
+          ticks: { color: '#46605A', font:{family:'JetBrains Mono', size:9} },
+          grid: { color: '#1A2321' }
+        }
+      }
+    }
+  });
+}
+
+ids.forEach(id => document.getElementById(id).addEventListener('input', update));
+update();
+</script>
+</body>
+</html>
