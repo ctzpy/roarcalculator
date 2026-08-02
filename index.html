@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Square Miner EV Calculator</title>
+<title>Roar Miner EV Calculator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -73,14 +73,54 @@
     padding:24px;
     margin-bottom:20px;
   }
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:0 0 16px;
+    gap:12px;
+  }
   .panel-label{
     font-family:var(--mono);
     font-size:11px;
     text-transform:uppercase;
     letter-spacing:0.1em;
     color:var(--text-faint);
-    margin:0 0 16px;
+    margin:0;
   }
+  .live{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    color:var(--text-dim);
+  }
+  .live .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--text-faint);
+    transition:background .2s, box-shadow .2s;
+  }
+  .live.ok .dot{background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+  .live.loading .dot{background:var(--amber);box-shadow:0 0 6px var(--amber);animation:pulse 1s infinite;}
+  .live.error .dot{background:var(--red);box-shadow:0 0 6px var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .refresh{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    padding:5px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .refresh:hover{border-color:var(--cyan-dim);color:var(--cyan);}
+  .refresh:disabled{opacity:0.5;cursor:default;}
   .grid{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -91,6 +131,17 @@
     font-size:12.5px;
     color:var(--text-dim);
     margin-bottom:6px;
+  }
+  .field label .tag{
+    font-family:var(--mono);
+    font-size:9.5px;
+    letter-spacing:0.06em;
+    color:var(--cyan-dim);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:1px 5px;
+    margin-left:6px;
+    vertical-align:middle;
   }
   .field .row{display:flex;gap:8px;}
   input[type=number]{
@@ -105,7 +156,8 @@
     outline:none;
     transition:border-color .15s;
   }
-  input[type=number]:focus{border-color:var(--cyan-dim);}
+  input[type=number].live-val{border-color:var(--cyan-dim);}
+  input[type=number]:focus{border-color:var(--cyan);}
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{opacity:0.4;}
 
@@ -164,6 +216,36 @@
     color:var(--text-dim);
     margin-top:2px;
   }
+
+  /* Mine vs Buy */
+  .mvb{
+    display:grid;
+    grid-template-columns:1.1fr 1fr 1fr;
+    gap:0;
+    align-items:stretch;
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:20px;
+  }
+  .mvb-cell{padding:18px 20px;border-right:1px solid var(--line);}
+  .mvb-cell:last-child{border-right:none;}
+  .mvb-verdict{
+    background:var(--verdict-bg, var(--panel-2));
+    display:flex;flex-direction:column;justify-content:center;
+  }
+  .mvb-verdict .lead{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;
+    text-transform:uppercase;color:var(--text-faint);margin:0 0 6px;
+  }
+  .mvb-verdict .word{
+    font-family:var(--mono);font-size:30px;font-weight:700;
+    margin:0;color:var(--verdict-color, var(--text));letter-spacing:0.02em;
+  }
+  .mvb-verdict .why{font-size:11.5px;color:var(--text-dim);margin:6px 0 0;line-height:1.5;}
+  .mvb-cell .k{font-size:11.5px;color:var(--text-dim);margin:0 0 7px;}
+  .mvb-cell .v{font-family:var(--mono);font-size:18px;font-weight:700;margin:0;}
+  .mvb-cell .vs{font-family:var(--mono);font-size:11px;color:var(--text-faint);margin:5px 0 0;}
   .chart-wrap{
     position:relative;
     height:240px;
@@ -188,17 +270,26 @@
     .grid{grid-template-columns:1fr;}
     .results{grid-template-columns:1fr;}
     .breakdown{grid-template-columns:1fr;}
+    .mvb{grid-template-columns:1fr;}
+    .mvb-cell{border-right:none;border-bottom:1px solid var(--line);}
+    .mvb-cell:last-child{border-bottom:none;}
   }
 </style>
 </head>
 <body>
 <div class="wrap">
   <p class="eyebrow">Full-coverage mining · 25/25 squares</p>
-  <h1>Square miner EV calculator</h1>
-  <p class="sub">Estimate your expected value per round when you deposit across every square. Adjust the inputs to match a live board, the results and chart update instantly.</p>
+  <h1>Roar miner EV calculator</h1>
+  <p class="sub">Estimate your expected value per round when you deposit across every square, and whether it's cheaper to mine ROAR or just buy it. ETH and ROAR prices update live from Robinhood Chain; adjust the board inputs to match a live round.</p>
 
   <div class="panel">
-    <p class="panel-label">Inputs</p>
+    <div class="panel-head">
+      <p class="panel-label">Inputs</p>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="live" id="liveStatus"><span class="dot"></span><span id="liveText">connecting…</span></span>
+        <button class="refresh" id="refreshBtn">↻ Refresh</button>
+      </div>
+    </div>
     <div class="grid">
       <div class="field">
         <label for="yourDeposit">Your deposit (ETH)</label>
@@ -209,20 +300,16 @@
         <input type="number" id="othersDeposit" value="0.04433" step="0.0001">
       </div>
       <div class="field">
-        <label for="ethPrice">ETH price (USD)</label>
+        <label for="ethPrice">ETH price (USD) <span class="tag">LIVE</span></label>
         <input type="number" id="ethPrice" value="1900" step="1">
       </div>
       <div class="field">
-        <label for="roarPrice">Token price (USD)</label>
-        <input type="number" id="roarPrice" value="20" step="0.1">
+        <label for="roarPrice">ROAR price (USD) <span class="tag">LIVE</span></label>
+        <input type="number" id="roarPrice" value="20" step="0.01">
       </div>
       <div class="field">
-        <label for="jackpotPool">Jackpot pool (tokens)</label>
+        <label for="jackpotPool">Jackpot pool (tokens) <span class="tag">LIVE</span></label>
         <input type="number" id="jackpotPool" value="45" step="0.1">
-      </div>
-      <div class="field">
-        <label for="oddsDenom">Jackpot odds (1 in N)</label>
-        <input type="number" id="oddsDenom" value="500" step="1">
       </div>
       <div class="field">
         <label for="roundReward">Round reward (tokens)</label>
@@ -266,8 +353,27 @@
     </div>
   </div>
 
+  <p class="panel-label" style="margin:28px 0 10px;">Mine or buy?</p>
+  <div class="mvb" id="mvb">
+    <div class="mvb-cell mvb-verdict" id="verdictCell">
+      <p class="lead">Cheaper to acquire ROAR by</p>
+      <p class="word" id="verdictWord">--</p>
+      <p class="why" id="verdictWhy">--</p>
+    </div>
+    <div class="mvb-cell">
+      <p class="k">Effective mining cost / ROAR</p>
+      <p class="v" id="mineCost">--</p>
+      <p class="vs" id="mineCostSub">at current board size</p>
+    </div>
+    <div class="mvb-cell">
+      <p class="k">Live market price / ROAR</p>
+      <p class="v" id="mktPrice">--</p>
+      <p class="vs" id="breakeven">--</p>
+    </div>
+  </div>
+
   <div class="panel">
-    <p class="panel-label">Net EV vs your deposit size</p>
+    <p class="panel-label" style="margin-bottom:16px;">Net EV vs your deposit size</p>
     <div class="chart-wrap">
       <canvas id="evChart"></canvas>
     </div>
@@ -275,21 +381,32 @@
   </div>
 
   <div class="foot">
-    <b>Assumptions:</b> you cover all 25 squares evenly (guaranteed presence on the winning square). Settlement rewards split proportionally to deposit share on the winning square, after the admin fee and a treasury fee on the losing pool. Token reward = base round reward + expected jackpot value (pool ÷ odds denominator), split the same way. This is expected value across many rounds, not a single-round guarantee — actual per-square deposits may differ from this even-split assumption.
+    <b>Assumptions:</b> you cover all 25 squares evenly (guaranteed presence on the winning square). Settlement rewards split proportionally to deposit share on the winning square, after the admin fee and a treasury fee on the losing pool. Token reward = base round reward + expected jackpot value (pool ÷ 500, the fixed on-chain odds denominator), split the same way.<br><br>
+    <b>Mine vs buy</b> compares your effective mining cost per ROAR — <span style="font-family:var(--mono)">k · T · ethPrice ÷ R</span>, where k is the fee drag, T the total board (ETH), R the tokens emitted per round — against the live market price. Mining is cheaper while the total board sits below the break-even pool; beyond it, buying on GigaDEX wins. k is the solo-coverage floor (~10.5%); real settlement loss is worse when others share the winning square, so treat the mining edge as an upper bound. This is expected value across many rounds, not a single-round guarantee, and not financial advice.
   </div>
 </div>
 
 <script>
-const ids = ['yourDeposit','othersDeposit','ethPrice','roarPrice','jackpotPool','oddsDenom','roundReward','adminBps','treasuryBps'];
-let chart;
+const DENOM = 500;            // jackpot odds: 1-in-500, fixed by current on-chain rules
+const ids = ['yourDeposit','othersDeposit','ethPrice','roarPrice','jackpotPool','roundReward','adminBps','treasuryBps'];
 
-function computeNetEV(y, others, ethPrice, roarPrice, pool, denom, reward, adminBps, treasuryBps){
+// --- Live data sources (Robinhood Chain, CORS-enabled) ---
+const RPC   = 'https://rpc.mainnet.chain.robinhood.com';
+const POOL  = '0xa25F973D479d3bd0eE9D79890645031f7923d55f'; // GigaDEX CL pool, token0=WETH token1=ROAR (both 18 dec)
+const GAME  = '0xB9E308C0de769aB61089Ef47231f0ff92AE8BF69'; // RoarGame; motherlode() = live jackpot pool (18 dec)
+const STATS = 'https://robinhoodchain.blockscout.com/api?module=stats&action=ethprice';
+
+let chart;
+let lastLive = 0;
+let livePartial = false;   // true when on-chain reads succeeded but ETH/USD is stale
+
+function computeNetEV(y, others, ethPrice, roarPrice, pool, reward, adminBps, treasuryBps){
   const T = y + others;
   if (T <= 0) return {netEV:0, share:0, settlementNet:0, tokenExpected:0};
   const a = adminBps/10000, t = treasuryBps/10000;
   const s = y / T;
   const settlementNet = -y * (a + t*(1-a)*(24/25));
-  const expectedTokenPerRound = reward + (pool/denom);
+  const expectedTokenPerRound = reward + (pool/DENOM);
   const tokenExpected = s * expectedTokenPerRound;
   const netEV = (settlementNet * ethPrice) + (tokenExpected * roarPrice);
   return {netEV, share:s, settlementNet, tokenExpected};
@@ -304,10 +421,11 @@ function readInputs(){
 function fmtETH(n){ return (n>=0?'+':'') + n.toFixed(6) + ' ETH'; }
 function fmtUSD(n){ return (n>=0?'+$':'-$') + Math.abs(n).toFixed(2); }
 function fmtTok(n){ return (n>=0?'+':'') + n.toFixed(4) + ' tokens'; }
+function fmtPrice(n){ return '$' + (n>=100 ? n.toFixed(2) : n>=1 ? n.toFixed(3) : n.toFixed(5)); }
 
 function update(){
   const v = readInputs();
-  const r = computeNetEV(v.yourDeposit, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.oddsDenom, v.roundReward, v.adminBps, v.treasuryBps);
+  const r = computeNetEV(v.yourDeposit, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.roundReward, v.adminBps, v.treasuryBps);
 
   document.getElementById('outShare').textContent = (r.share*100).toFixed(2) + '%';
 
@@ -326,6 +444,31 @@ function update(){
   document.getElementById('outTokenAmt').textContent = fmtTok(r.tokenExpected);
   document.getElementById('outTokenUsd').textContent = fmtUSD(r.tokenExpected*v.roarPrice);
 
+  // --- Mine vs buy ---
+  const a = v.adminBps/10000, t = v.treasuryBps/10000;
+  const k = a + t*(1-a)*(24/25);                 // settlement fee drag (solo-coverage floor)
+  const R = v.roundReward + v.jackpotPool/DENOM;  // tokens emitted per round
+  const T = v.yourDeposit + v.othersDeposit;
+  const mineCost = (T>0 && R>0) ? (k * T * v.ethPrice / R) : 0;   // USD per ROAR
+  const mkt = v.roarPrice;                                        // USD per ROAR (live)
+  const breakevenPool = (R>0 && k>0 && v.ethPrice>0) ? (mkt * R) / (k * v.ethPrice) : 0; // T* in ETH
+  const mineWins = mkt >= mineCost;
+
+  document.getElementById('mineCost').textContent = fmtPrice(mineCost);
+  document.getElementById('mktPrice').textContent = fmtPrice(mkt);
+  const wordEl = document.getElementById('verdictWord');
+  const cell = document.getElementById('verdictCell');
+  wordEl.textContent = mineWins ? 'MINE' : 'BUY';
+  cell.style.setProperty('--verdict-color', mineWins ? 'var(--cyan)' : 'var(--amber)');
+  cell.style.setProperty('--verdict-bg', mineWins ? 'rgba(46,230,196,0.06)' : 'rgba(242,184,75,0.06)');
+  const edge = mineCost>0 ? ((mkt - mineCost)/mineCost*100) : 0;
+  document.getElementById('verdictWhy').textContent = mineWins
+    ? 'Minting ROAR costs ' + Math.abs(edge).toFixed(0) + '% less than the market — deploy.'
+    : 'Minting ROAR costs ' + Math.abs(edge).toFixed(0) + '% more than the market — buy on GigaDEX.';
+  document.getElementById('breakeven').textContent =
+    'Break-even board ≈ ' + breakevenPool.toFixed(5) + ' ETH (now ' + T.toFixed(5) + ')';
+
+  // --- Chart ---
   const maxX = Math.max(v.othersDeposit * 2, v.yourDeposit * 3, 0.001);
   const points = 40;
   const labels = [];
@@ -333,14 +476,14 @@ function update(){
   let peakX = 0, peakY = -Infinity;
   for (let i = 0; i <= points; i++){
     const y = (maxX * i) / points;
-    const rr = computeNetEV(y, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.oddsDenom, v.roundReward, v.adminBps, v.treasuryBps);
+    const rr = computeNetEV(y, v.othersDeposit, v.ethPrice, v.roarPrice, v.jackpotPool, v.roundReward, v.adminBps, v.treasuryBps);
     labels.push(y);
     data.push(rr.netEV);
     if (rr.netEV > peakY){ peakY = rr.netEV; peakX = y; }
   }
 
   document.getElementById('chartNote').textContent =
-    'Other miners\u2019 deposit held fixed. Peak net EV \u2248 ' + fmtUSD(peakY) + ' near ' + peakX.toFixed(5) + ' ETH deposit.';
+    'Other miners’ deposit held fixed. Peak net EV ≈ ' + fmtUSD(peakY) + ' near ' + peakX.toFixed(5) + ' ETH deposit.';
 
   if (chart) chart.destroy();
   const ctx = document.getElementById('evChart').getContext('2d');
@@ -388,8 +531,103 @@ function update(){
   });
 }
 
+// --- Live price fetching ---
+function setLive(state, text){
+  const el = document.getElementById('liveStatus');
+  el.className = 'live' + (state ? ' ' + state : '');
+  document.getElementById('liveText').textContent = text;
+}
+
+async function fetchEthUsd(){
+  const res = await fetch(STATS, {cache:'no-store'});
+  const j = await res.json();
+  const p = parseFloat(j.result && j.result.ethusd);
+  if (!isFinite(p) || p <= 0) throw new Error('eth price unavailable');
+  return p;
+}
+
+async function fetchWethPerRoar(){
+  // slot0() = 0x3850c7bd ; first 32-byte word is sqrtPriceX96
+  const res = await fetch(RPC, {
+    method:'POST', cache:'no-store',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:POOL,data:'0x3850c7bd'},'latest']})
+  });
+  const j = await res.json();
+  const hex = j.result;
+  if (!hex || hex.length < 66) throw new Error('slot0 unavailable');
+  const sqrtPriceX96 = BigInt('0x' + hex.slice(2, 66));
+  const sp = Number(sqrtPriceX96) / 2**96;
+  const roarPerWeth = sp * sp;                 // token1 per token0 = ROAR per WETH (both 18 dec)
+  if (!isFinite(roarPerWeth) || roarPerWeth <= 0) throw new Error('bad price');
+  return 1 / roarPerWeth;                      // WETH per ROAR
+}
+
+async function fetchMotherlode(){
+  // motherlode() = 0x47fadcb6 ; returns uint256 jackpot pool in token wei (18 dec)
+  const res = await fetch(RPC, {
+    method:'POST', cache:'no-store',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:GAME,data:'0x47fadcb6'},'latest']})
+  });
+  const j = await res.json();
+  const hex = j.result;
+  if (!hex || hex.length < 66) throw new Error('motherlode unavailable');
+  return Number(BigInt(hex)) / 1e18;           // tokens
+}
+
+async function refreshLive(){
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  setLive('loading', 'fetching…');
+
+  // Independent fetches: a rate-limited ETH endpoint must not wipe the on-chain reads
+  const [ethR, roarR, jackR] = await Promise.allSettled([fetchEthUsd(), fetchWethPerRoar(), fetchMotherlode()]);
+  const ethEl  = document.getElementById('ethPrice');
+  const roarEl = document.getElementById('roarPrice');
+  const jackEl = document.getElementById('jackpotPool');
+  let ok = 0;
+
+  if (ethR.status === 'fulfilled'){ ethEl.value = ethR.value.toFixed(2); ethEl.classList.add('live-val'); ok++; }
+  if (jackR.status === 'fulfilled'){ jackEl.value = jackR.value.toFixed(2); jackEl.classList.add('live-val'); ok++; }
+  if (roarR.status === 'fulfilled'){
+    // ROAR price is a WETH ratio; convert with the freshest ETH price we have (live, else current field)
+    const ethForCalc = (ethR.status === 'fulfilled') ? ethR.value : (parseFloat(ethEl.value) || 0);
+    if (ethForCalc > 0){ roarEl.value = (roarR.value * ethForCalc).toFixed(4); roarEl.classList.add('live-val'); }
+    ok++;
+  }
+
+  if (ok > 0){
+    lastLive = Date.now();
+    livePartial = ok !== 3;
+    setLive('ok', livePartial ? 'partial · ETH price stale · just now' : 'live · updated just now');
+    update();
+  } else {
+    setLive('error', 'live fetch failed — using manual values');
+  }
+  btn.disabled = false;
+}
+
+// Relative "updated Xs ago" ticker
+setInterval(() => {
+  const el = document.getElementById('liveStatus');
+  if (!el.classList.contains('ok') || !lastLive) return;
+  const secs = Math.round((Date.now() - lastLive)/1000);
+  const prefix = livePartial ? 'partial · ETH stale · ' : 'live · updated ';
+  const ago = secs < 5 ? 'just now' : secs < 60 ? secs + 's ago' : Math.round(secs/60) + 'm ago';
+  document.getElementById('liveText').textContent = prefix + ago;
+}, 1000);
+
+// If the user hand-edits a live field, drop the "live" styling on it
+['ethPrice','roarPrice','jackpotPool'].forEach(id =>
+  document.getElementById(id).addEventListener('input', e => e.target.classList.remove('live-val')));
+
 ids.forEach(id => document.getElementById(id).addEventListener('input', update));
+document.getElementById('refreshBtn').addEventListener('click', refreshLive);
+
 update();
+refreshLive();
+setInterval(refreshLive, 60000);   // auto-refresh each round (~60s)
 </script>
 </body>
 </html>
