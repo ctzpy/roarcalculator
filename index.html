@@ -280,7 +280,7 @@
 <div class="wrap">
   <p class="eyebrow">Full-coverage mining · 25/25 squares</p>
   <h1>Roar miner EV calculator</h1>
-  <p class="sub">Estimate your expected value per round when you deposit across every square, and whether it's cheaper to mine ROAR or just buy it. ETH and ROAR prices update live from Robinhood Chain; adjust the board inputs to match a live round.</p>
+  <p class="sub">Estimate your expected value per round when you deposit across every square, and whether it's cheaper to mine ROAR or just buy it. ROAR price and the live board come from Robinhood Chain; ETH/USD from Coinbase. Adjust the board inputs to match a live round.</p>
 
   <div class="panel">
     <div class="panel-head">
@@ -395,7 +395,9 @@ const ids = ['yourDeposit','othersDeposit','ethPrice','roarPrice','jackpotPool',
 const RPC   = 'https://rpc.mainnet.chain.robinhood.com';
 const POOL  = '0xa25F973D479d3bd0eE9D79890645031f7923d55f'; // GigaDEX CL pool, token0=WETH token1=ROAR (both 18 dec)
 const GAME  = '0xB9E308C0de769aB61089Ef47231f0ff92AE8BF69'; // RoarGame; motherlode() = live jackpot pool (18 dec)
-const STATS = 'https://robinhoodchain.blockscout.com/api?module=stats&action=ethprice';
+// ETH/USD from a liquid CEX (real USD spot, CORS-enabled, no key): Coinbase primary, Kraken fallback
+const ETH_PRICE_PRIMARY  = 'https://api.coinbase.com/v2/prices/ETH-USD/spot';
+const ETH_PRICE_FALLBACK = 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD';
 
 let chart;
 let lastLive = 0;
@@ -543,11 +545,22 @@ function setLive(state, text){
 }
 
 async function fetchEthUsd(){
-  const res = await fetch(STATS, {cache:'no-store'});
-  const j = await res.json();
-  const p = parseFloat(j.result && j.result.ethusd);
-  if (!isFinite(p) || p <= 0) throw new Error('eth price unavailable');
-  return p;
+  // Coinbase spot (real USD) — deep liquidity, permissive CORS, no key
+  try{
+    const r = await fetch(ETH_PRICE_PRIMARY, {cache:'no-store'});
+    const j = await r.json();
+    const p = parseFloat(j.data && j.data.amount);
+    if (isFinite(p) && p > 0) return p;
+    throw new Error('coinbase malformed');
+  }catch(e){
+    // Fallback: Kraken last-trade price (result.XETHZUSD.c[0])
+    const r = await fetch(ETH_PRICE_FALLBACK, {cache:'no-store'});
+    const j = await r.json();
+    const t = j.result && j.result.XETHZUSD;
+    const p = parseFloat(t && t.c && t.c[0]);
+    if (isFinite(p) && p > 0) return p;
+    throw new Error('eth price unavailable');
+  }
 }
 
 async function fetchWethPerRoar(){
