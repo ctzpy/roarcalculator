@@ -296,7 +296,7 @@
         <input type="number" id="yourDeposit" value="0.00125" step="0.00001">
       </div>
       <div class="field">
-        <label for="othersDeposit">Other miners total (ETH)</label>
+        <label for="othersDeposit">Other miners total (ETH) <span class="tag">LIVE</span></label>
         <input type="number" id="othersDeposit" value="0.04433" step="0.0001">
       </div>
       <div class="field">
@@ -323,6 +323,7 @@
         </div>
       </div>
     </div>
+    <p class="chart-note" id="boardNote" style="margin-top:16px;">Other miners' total is a live per-round snapshot — it fills through each 60s round and resets at settlement.</p>
   </div>
 
   <div class="results">
@@ -382,7 +383,7 @@
 
   <div class="foot">
     <b>Assumptions:</b> you cover all 25 squares evenly (guaranteed presence on the winning square). Settlement rewards split proportionally to deposit share on the winning square, after the admin fee and a treasury fee on the losing pool. Token reward = base round reward + expected jackpot value (pool ÷ 500, the fixed on-chain odds denominator), split the same way.<br><br>
-    <b>Mine vs buy</b> compares your effective mining cost per ROAR — <span style="font-family:var(--mono)">k · T · ethPrice ÷ R</span>, where k is the fee drag, T the total board (ETH), R the tokens emitted per round — against the live market price. Mining is cheaper while the total board sits below the break-even pool; beyond it, buying on GigaDEX wins. k is the solo-coverage floor (~10.5%); real settlement loss is worse when others share the winning square, so treat the mining edge as an upper bound. This is expected value across many rounds, not a single-round guarantee, and not financial advice.
+    <b>Mine vs buy</b> compares your effective mining cost per ROAR — <span style="font-family:var(--mono)">k · T · ethPrice ÷ R</span>, where k is the fee drag, T the total board (ETH), R the tokens emitted per round — against the live market price. Mining is cheaper while the total board sits below the break-even pool; beyond it, buying on GigaDEX wins. With full coverage and the field spread evenly across squares, your settlement loss is exactly k ≈ 10.5% of your deposit, independent of pool size (identical to playing solo) — and this is the <em>worst</em> case: when others deposit unevenly you scoop the squares they underweight, so real loss is only ever smaller. The mining edge shown is therefore conservative. This is expected value across many rounds, not a single-round guarantee, and not financial advice.
   </div>
 </div>
 
@@ -446,7 +447,7 @@ function update(){
 
   // --- Mine vs buy ---
   const a = v.adminBps/10000, t = v.treasuryBps/10000;
-  const k = a + t*(1-a)*(24/25);                 // settlement fee drag (solo-coverage floor)
+  const k = a + t*(1-a)*(24/25);                 // settlement fee drag; exact under even coverage & the max-loss case
   const R = v.roundReward + v.jackpotPool/DENOM;  // tokens emitted per round
   const T = v.yourDeposit + v.othersDeposit;
   const mineCost = (T>0 && R>0) ? (k * T * v.ethPrice / R) : 0;   // USD per ROAR
@@ -461,10 +462,13 @@ function update(){
   wordEl.textContent = mineWins ? 'MINE' : 'BUY';
   cell.style.setProperty('--verdict-color', mineWins ? 'var(--cyan)' : 'var(--amber)');
   cell.style.setProperty('--verdict-bg', mineWins ? 'rgba(46,230,196,0.06)' : 'rgba(242,184,75,0.06)');
-  const edge = mineCost>0 ? ((mkt - mineCost)/mineCost*100) : 0;
+  // "A is P% cheaper than B" ⇒ P = (B − A)/B, using the more-expensive side as the base
+  const cheaperPct = mineWins
+    ? (mkt > 0 ? (mkt - mineCost)/mkt*100 : 0)          // minting cheaper than buying
+    : (mineCost > 0 ? (mineCost - mkt)/mineCost*100 : 0); // buying cheaper than minting
   document.getElementById('verdictWhy').textContent = mineWins
-    ? 'Minting ROAR costs ' + Math.abs(edge).toFixed(0) + '% less than the market — deploy.'
-    : 'Minting ROAR costs ' + Math.abs(edge).toFixed(0) + '% more than the market — buy on GigaDEX.';
+    ? 'Minting is ' + cheaperPct.toFixed(0) + '% cheaper than buying — deploy.'
+    : 'Buying is ' + cheaperPct.toFixed(0) + '% cheaper than minting — buy on GigaDEX.';
   document.getElementById('breakeven').textContent =
     'Break-even board ≈ ' + breakevenPool.toFixed(5) + ' ETH (now ' + T.toFixed(5) + ')';
 
@@ -563,17 +567,36 @@ async function fetchWethPerRoar(){
   return 1 / roarPerWeth;                      // WETH per ROAR
 }
 
-async function fetchMotherlode(){
-  // motherlode() = 0x47fadcb6 ; returns uint256 jackpot pool in token wei (18 dec)
+async function rpcCall(to, data){
   const res = await fetch(RPC, {
     method:'POST', cache:'no-store',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:GAME,data:'0x47fadcb6'},'latest']})
+    body: JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to,data},'latest']})
   });
   const j = await res.json();
-  const hex = j.result;
-  if (!hex || hex.length < 66) throw new Error('motherlode unavailable');
-  return Number(BigInt(hex)) / 1e18;           // tokens
+  if (!j.result || j.result.length < 66) throw new Error('rpc call failed');
+  return j.result;
+}
+
+async function fetchMotherlode(){
+  // motherlode() = 0x47fadcb6 ; uint256 jackpot pool in token wei (18 dec)
+  return Number(BigInt(await rpcCall(GAME, '0x47fadcb6'))) / 1e18;
+}
+
+async function fetchBoard(){
+  // currentRoundId() = 0x9cbe5efd, then getRound(uint256) = 0x8f1327c0
+  const roundId = BigInt(await rpcCall(GAME, '0x9cbe5efd'));
+  const arg = roundId.toString(16).padStart(64, '0');
+  const h = (await rpcCall(GAME, '0x8f1327c0' + arg)).slice(2);
+  const word = i => BigInt('0x' + h.slice(i*64, (i+1)*64));
+  // struct layout: 0 startAt, 1 endAt, 2 settleAfter, ... 10 totalSettlementDeployed, 18 uniqueMiners
+  return {
+    roundId: Number(roundId),
+    startAt: Number(word(0)),
+    endAt:   Number(word(1)),
+    total:   Number(word(10)) / 1e18,   // totalSettlementDeployed, ETH (all miners this round)
+    miners:  Number(word(18))
+  };
 }
 
 async function refreshLive(){
@@ -582,11 +605,12 @@ async function refreshLive(){
   setLive('loading', 'fetching…');
 
   // Independent fetches: a rate-limited ETH endpoint must not wipe the on-chain reads
-  const [ethR, roarR, jackR] = await Promise.allSettled([fetchEthUsd(), fetchWethPerRoar(), fetchMotherlode()]);
-  const ethEl  = document.getElementById('ethPrice');
-  const roarEl = document.getElementById('roarPrice');
-  const jackEl = document.getElementById('jackpotPool');
-  let ok = 0;
+  const [ethR, roarR, jackR, boardR] = await Promise.allSettled([fetchEthUsd(), fetchWethPerRoar(), fetchMotherlode(), fetchBoard()]);
+  const ethEl   = document.getElementById('ethPrice');
+  const roarEl  = document.getElementById('roarPrice');
+  const jackEl  = document.getElementById('jackpotPool');
+  const othersEl= document.getElementById('othersDeposit');
+  let ok = 0, total = 4;
 
   if (ethR.status === 'fulfilled'){ ethEl.value = ethR.value.toFixed(2); ethEl.classList.add('live-val'); ok++; }
   if (jackR.status === 'fulfilled'){ jackEl.value = jackR.value.toFixed(2); jackEl.classList.add('live-val'); ok++; }
@@ -596,11 +620,27 @@ async function refreshLive(){
     if (ethForCalc > 0){ roarEl.value = (roarR.value * ethForCalc).toFixed(4); roarEl.classList.add('live-val'); }
     ok++;
   }
+  if (boardR.status === 'fulfilled'){
+    const b = boardR.value;
+    // "Other miners total" = the live board you're deploying against (matches the site's TOTAL DEPLOYED).
+    // Your hypothetical deposit is added on top in the EV model (T = others + your deposit), so do NOT subtract it here.
+    othersEl.value = b.total.toFixed(6);
+    othersEl.classList.add('live-val');
+    const now = Date.now()/1000;
+    const phase = now <= b.endAt
+      ? 'deposit window · ' + Math.max(0, Math.round(b.endAt - now)) + 's left'
+      : 'settling…';
+    document.getElementById('boardNote').textContent =
+      'Round #' + b.roundId + ' · ' + b.miners + ' miner' + (b.miners===1?'':'s') +
+      ' · total deployed ' + b.total.toFixed(5) + ' ETH · ' + phase +
+      ' — live per-round snapshot, resets each round.';
+    ok++;
+  }
 
   if (ok > 0){
     lastLive = Date.now();
-    livePartial = ok !== 3;
-    setLive('ok', livePartial ? 'partial · ETH price stale · just now' : 'live · updated just now');
+    livePartial = ok !== total;
+    setLive('ok', livePartial ? 'partial · some feeds stale · just now' : 'live · updated just now');
     update();
   } else {
     setLive('error', 'live fetch failed — using manual values');
@@ -613,13 +653,13 @@ setInterval(() => {
   const el = document.getElementById('liveStatus');
   if (!el.classList.contains('ok') || !lastLive) return;
   const secs = Math.round((Date.now() - lastLive)/1000);
-  const prefix = livePartial ? 'partial · ETH stale · ' : 'live · updated ';
+  const prefix = livePartial ? 'partial · some feeds stale · ' : 'live · updated ';
   const ago = secs < 5 ? 'just now' : secs < 60 ? secs + 's ago' : Math.round(secs/60) + 'm ago';
   document.getElementById('liveText').textContent = prefix + ago;
 }, 1000);
 
 // If the user hand-edits a live field, drop the "live" styling on it
-['ethPrice','roarPrice','jackpotPool'].forEach(id =>
+['ethPrice','roarPrice','jackpotPool','othersDeposit'].forEach(id =>
   document.getElementById(id).addEventListener('input', e => e.target.classList.remove('live-val')));
 
 ids.forEach(id => document.getElementById(id).addEventListener('input', update));
